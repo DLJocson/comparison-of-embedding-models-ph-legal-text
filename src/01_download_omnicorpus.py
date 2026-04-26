@@ -5,33 +5,50 @@ from dotenv import load_dotenv
 load_dotenv()
 hf_token = os.getenv("HF_TOKEN")
 
-print("Downloading specific laws segment from OmniCorpus...")
+print("Downloading and cleaning laws segment from OmniCorpus...")
 
 path = "hf://datasets/mongramosjr/philippine-omnicorpus/data/philippine_laws.parquet"
-
 df = pd.read_parquet(
     path, 
     storage_options={"token": hf_token}
 )
 
-print("\n--- Diagnostic: Column Names Found ---")
-print(df.columns.tolist())
-
 CAT_COL = 'label' 
 
+print(f"Original dataset size: {len(df)} rows")
+
+df = df.dropna(subset=['text', CAT_COL])
+
+df = df[df['text'].str.split().str.len() > 50]
+
+print(f"Size after removing empty/short rows: {len(df)} rows")
+
+valid_statutes = ['Republic Acts', 'Commonwealth Act', 'Acts']
+valid_decisions = ['Decisions / Signed Resolutions', 'Decisions / Sign Resolutions']
+valid_regs = ['Executive Orders', 'Memorandum Circulars', 'Letter of Instruction']
+
+statutes_df = df[df[CAT_COL].isin(valid_statutes)]
+decisions_df = df[df[CAT_COL].isin(valid_decisions)]
+regs_df = df[df[CAT_COL].isin(valid_regs)]
+
 try:
-    statutes = df[df[CAT_COL].str.contains('Republic Act|Commonwealth Act|Act', case=False, na=False)].sample(n=900, random_state=42)
-    
-    decisions = df[df[CAT_COL].str.contains('Decision', case=False, na=False)].sample(n=1200, random_state=42)
-    
-    regs = df[df[CAT_COL].str.contains('Executive Order|Memorandum Circular|Instruction', case=False, na=False)].sample(n=300, random_state=42)
+    statutes = statutes_df.sample(n=900, random_state=42)
+    decisions = decisions_df.sample(n=1200, random_state=42)
+    regs = regs_df.sample(n=300, random_state=42)
 
     plrb_corpus = pd.concat([statutes, decisions, regs])
     
     os.makedirs("data/raw", exist_ok=True)
     
     plrb_corpus.to_csv("data/raw/master_legal_corpus.csv", index=False)
-    print("\nStep 1 Complete: 2,400 documents saved to data/raw/master_legal_corpus.csv")
+    
+    print("\n--- Cleaning and Extraction Complete ---")
+    print(f"Successfully saved 2,400 strictly validated documents to data/raw/master_legal_corpus.csv")
+    print("Document Breakdown:")
+    print(plrb_corpus[CAT_COL].value_counts())
 
 except ValueError as e:
-    print(f"\nError: Could not find enough documents in one of the categories. {e}")
+    print(f"\nError during sampling: {e}")
+    print(f"Available Statutes: {len(statutes_df)}")
+    print(f"Available Decisions: {len(decisions_df)}")
+    print(f"Available Regulations: {len(regs_df)}")

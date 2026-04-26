@@ -7,6 +7,7 @@ from langdetect import detect_langs
 def normalize_text(text):
     if not isinstance(text, str): return ""
     text = unicodedata.normalize('NFKC', text)
+    # Collapse multiple whitespaces/newlines into a single space
     return re.sub(r'\s+', ' ', text).strip()
 
 def segment_passages(text, window=300, stride=50):
@@ -17,16 +18,18 @@ def identify_language(text):
     try:
         predictions = detect_langs(text)
         res = {l.lang: l.prob for l in predictions}
-        # Code-switching logic: If both Tagalog and English are detected > 20%
+        
+        # Code-switching heuristic: If both Tagalog (tl) and English (en) are > 20%
         if 'en' in res and 'tl' in res and min(res['en'], res['tl']) > 0.20:
             return "Code-Switched"
         
         dominant = predictions[0].lang
         return "Filipino" if dominant == 'tl' else "English" if dominant == 'en' else "Other"
     except:
+        # Handles edge cases where a chunk is only numbers/symbols
         return "Unknown"
 
-print("Loading master corpus for preprocessing...")
+print("Loading perfectly cleaned master corpus for preprocessing...")
 df = pd.read_csv("data/raw/master_legal_corpus.csv")
 final_data = []
 
@@ -52,7 +55,7 @@ processed_df = pd.DataFrame(final_data)
 processed_df.to_csv("data/processed/module1_processed_passages.csv", index=False)
 
 print("\n========================================")
-print("   PROGRESS CHECK 1: DATA SUMMARY")
+print("   PROGRESS CHECK 1: FINAL DATA SUMMARY")
 print("========================================")
 print(f"Total Original Documents : {len(df)}")
 print(f"Total Passages Generated : {len(processed_df)}")
