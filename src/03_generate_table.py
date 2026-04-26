@@ -1,11 +1,20 @@
 import pandas as pd
 
+# ============================================================================
+# CORPUS STATISTICS TABLE GENERATION
+# ============================================================================
+
 print("Generating Table 1 Statistics from processed data...")
 
-# 1. Load your processed dataset
+# Load processed passages with language tags and document metadata
 df = pd.read_csv("data/processed/module1_processed_passages.csv")
 
-# 2. Map your specific labels to the paper's broad categories
+# ============================================================================
+# CATEGORY STANDARDIZATION
+# ============================================================================
+
+# Consolidate detailed document types into broad categories for corpus summary
+# This aligns source document types with research framework categories
 category_mapping = {
     'Republic Acts': 'Republic Acts / Pres. Decrees',
     'Acts': 'Republic Acts / Pres. Decrees',
@@ -17,34 +26,50 @@ category_mapping = {
 }
 df['Broad_Category'] = df['document_type'].map(category_mapping)
 
-# 3. Calculate the number of tokens per passage
+# ============================================================================
+# TOKEN COUNT CALCULATION
+# ============================================================================
+
+# Compute token count per passage for corpus size metrics
 df['Tokens'] = df['passage_text'].astype(str).apply(lambda x: len(x.split()))
 
-# 4. Create a pivot table to count languages per category
+# ============================================================================
+# LANGUAGE DISTRIBUTION ANALYSIS
+# ============================================================================
+
+# Cross-tabulate languages detected across document categories
 lang_counts = pd.crosstab(df['Broad_Category'], df['language'])
 
-# Ensure required columns exist
+# Ensure all language columns exist with zero values if absent
 for col in ['English', 'Filipino', 'Code-Switched']:
     if col not in lang_counts.columns:
         lang_counts[col] = 0
 
-# 5. Get total passages and average tokens per category
+# ============================================================================
+# CORPUS AGGREGATION BY CATEGORY
+# ============================================================================
+
+# Compute passage count and token statistics per document category
 agg_df = df.groupby('Broad_Category').agg(
     Total=('passage_text', 'count'),
     Avg_Tokens=('Tokens', 'mean')
 )
 
-# 6. Merge the data together
+# Merge aggregation and language distribution tables
 table = agg_df.join(lang_counts)
 
-# Keep only the columns requested in the image (Dropping the 'Other' category)
+# ============================================================================
+# TABLE FORMATTING & FINALIZATION
+# ============================================================================
+
+# Select columns in output order: total passages, language breakdown, avg tokens
 table = table[['Total', 'English', 'Filipino', 'Code-Switched', 'Avg_Tokens']]
 
-# Reorder rows to match your image exactly
+# Reorder rows by legal document category for publication format
 row_order = ['Republic Acts / Pres. Decrees', 'Supreme Court Decisions', 'Administrative Regulations']
 table = table.reindex(row_order)
 
-# 7. Calculate the "Total" bottom row
+# Calculate corpus-wide summary statistics
 total_row = pd.DataFrame({
     'Total': [table['Total'].sum()],
     'English': [table['English'].sum()],
@@ -53,16 +78,21 @@ total_row = pd.DataFrame({
     'Avg_Tokens': [df['Tokens'].mean()]
 }, index=['Total'])
 
-# Append total row
+# Append total row to corpus statistics table
 final_table = pd.concat([table, total_row])
 
-# Round average tokens to whole numbers
+# Round average tokens to integers for readability
 final_table['Avg_Tokens'] = final_table['Avg_Tokens'].round().astype(int)
 
-# 8. Save to CSV and Print
+# ============================================================================
+# OUTPUT & SUMMARY
+# ============================================================================
+
+# Export table to CSV for integration into manuscript
 output_path = "data/processed/Table_1_Corpus_Statistics.csv"
 final_table.to_csv(output_path, index_label="Document Type")
 
+# Display final corpus statistics summary
 print("\n" + "="*80)
 print("   TABLE 1: PLRB CORPUS STATISTICS (ACTUAL EMPIRICAL DATA)")
 print("="*80)
